@@ -4,6 +4,29 @@ All notable changes to Muninn are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [2.1.0] - 2026-07-25 - Live TCP stream ingestion (`--stream`)
+
+Feature release. Until now, feeding Muninn from a live SBS-1/BaseStation
+TCP port (e.g. dump1090 `--net`'s port 30003) meant running an external
+`ncat`/`tee` process to land the feed on disk, then `--watch`ing that
+directory on a poll interval. That's an extra moving part and adds
+latency equal to the poll interval on top of the feed's own delay.
+
+`--stream HOST[:PORT]` connects straight to the TCP feed and uploads
+updates as they arrive, flushing only the aircraft that changed since
+the last flush (`--stream-interval`, default 5s — well under `--watch`'s
+30s default). Auto-reconnects with backoff if the receiver drops the
+link; already-decoded state survives the reconnect and flushes on the
+next successful cycle. Port defaults to 30003 when omitted.
+
+Only SBS-1/BaseStation (line-oriented text) is supported this way.
+Beast binary (port 30005) is a framed binary protocol and stays on the
+file-based `--watch` + `parse_beast` path.
+
+### Added
+- `--stream HOST[:PORT]` — live TCP ingestion, no input file/directory required.
+- `--stream-interval N` — seconds between upload flushes (default: 5).
+
 ## [2.0.17] - 2026-07-23 - Generic CSV: stop letting a degraded row clobber good data
 
 Bug-fix release. Reported by piratepat_ on Discord: a uConsole/Watch Dogs Go

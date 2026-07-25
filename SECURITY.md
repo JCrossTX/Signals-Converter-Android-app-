@@ -3,6 +3,7 @@
 ## What this tool does
 
 - Reads a local ADS-B text file (or every supported file in a chosen folder).
+- With `--stream HOST[:PORT]` (v2.1.0+), instead connects directly to a TCP address **you supply on the command line** and reads a live SBS-1/BaseStation feed from it — no file involved. The host/port is never inferred, guessed, or pulled from anywhere but that flag; this is the same trust model as `--api-url`, just for the input side instead of the output side.
 - Decodes aircraft records.
 - Writes a JSON output file next to the input, or in the configured output folder.
 - Optionally POSTs the records to `https://wdgwars.pl/endpoint/upload/` (the server's Cloudflare-friendly alias of `/api/upload/`, default since v2.0.4; configurable).
@@ -14,6 +15,7 @@
 - ❌ **No telemetry or analytics.** The only outbound traffic is:
   - `https://wdgwars.pl/endpoint/upload/` (alias of `/api/upload/`) — only when `--upload` is set. Hostname hardcoded; override with `--api-url`.
   - `https://api.github.com/repos/Yggdrasil-AI-labs/adsb-to-wdgwars/releases/latest` — single HEAD request, **at most once per 24h**, to compare your local version to the latest tag. No identifiers, no machine info, no usage data — just a public-API call to read a release tag. Result is cached in `~/.config/muninn/version-check.json`. Delete that file to reset; set `__version__` to `"99.0.0"` or stub out `_check_for_update()` if you want to disable it entirely.
+  - A raw TCP connection to whatever `--stream HOST[:PORT]` you pass — only when that flag is set, and only to the address you gave it. Muninn never scans, defaults to, or discovers a host on its own; if you don't pass `--stream`, no such connection is ever attempted.
 - ❌ **No `eval`, `exec`, `os.system`, or `shell=True` subprocess calls.** No command-injection paths.
 - ❌ **No remote code download/execution.** Pure stdlib + optional `pyModeS` (open-source, MIT, well-known in the ADS-B community).
 - ❌ **No data sent anywhere except WDGoWars when explicitly opted in via `--upload`.**

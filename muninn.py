@@ -54,7 +54,7 @@ License: MIT
 """
 from __future__ import annotations
 
-__version__ = "2.0.17"
+__version__ = "2.1.0"
 GITHUB_REPO = "Yggdrasil-AI-labs/adsb-to-wdgwars"
 GITHUB_URL = f"https://github.com/{GITHUB_REPO}"
 
@@ -93,6 +93,7 @@ import os
 import re
 import shlex
 import shutil
+import socket
 import subprocess
 import sys
 import textwrap
@@ -822,54 +823,63 @@ def _warn_range(records: list[dict]) -> None:
 # MSG,<type>,<sess>,<aircraft>,<hex>,<flightID>,<gen_date>,<gen_time>,
 # <log_date>,<log_time>,<callsign>,<altitude>,<speed>,<heading>,<lat>,<lon>,
 # <vrate>,<squawk>,<alert>,<emerg>,<spi>,<onground>
+def _ingest_sbs1_row(r: list[str], rows: dict[str, dict]) -> str | None:
+    """Fold one already-CSV-split SBS-1 row into the running `rows`
+    accumulator (icao -> partial record). Returns the ICAO touched, or
+    None if the row was malformed/irrelevant. Shared by the file parser
+    (parse_sbs1) and the live --stream ingestion loop (stream_tcp) so
+    both stay in lockstep with the same field mapping."""
+    if len(r) < 22 or r[0] != "MSG":
+        return None
+    icao = (r[4] or "").upper()
+    if not icao:
+        return None
+    try:
+        # MSG type 3 = airborne position (lat/lon present)
+        # MSG type 4 = airborne velocity (speed, heading, vrate)
+        # MSG type 1 = identification (callsign)
+        lat = float(r[14]) if r[14] else None
+        lon = float(r[15]) if r[15] else None
+        alt = int(r[11]) if r[11] else 0
+        speed = int(float(r[12])) if r[12] else 0
+        heading = int(float(r[13])) if r[13] else 0
+        callsign = (r[10] or "").strip()
+    except (ValueError, IndexError):
+        return None
+    # Timestamp from columns 6/7 (msg gen date/time)
+    ts_str = _now_iso()
+    try:
+        if r[6] and r[7]:
+            d = r[6].replace("/", "-")
+            t = r[7].split(".")[0]
+            ts_str = f"{d} {t}"
+    except Exception:
+        pass
+
+    entry = rows.setdefault(icao, {"icao": icao, "callsign": "",
+                                  "lat": None, "lon": None,
+                                  "alt_ft": 0, "speed_kt": 0,
+                                  "heading": 0, "first_seen": ts_str})
+    entry["first_seen"] = ts_str
+    if callsign:
+        entry["callsign"] = callsign
+    if lat is not None and lon is not None:
+        entry["lat"] = lat
+        entry["lon"] = lon
+    if alt:
+        entry["alt_ft"] = alt
+    if speed:
+        entry["speed_kt"] = speed
+    if heading:
+        entry["heading"] = heading
+    return icao
+
+
 def parse_sbs1(path: Path) -> dict[str, dict]:
     rows: dict[str, dict] = {}
     with path.open("r", encoding="utf-8", errors="replace") as f:
         for r in csv.reader(f):
-            if len(r) < 22 or r[0] != "MSG":
-                continue
-            icao = (r[4] or "").upper()
-            if not icao:
-                continue
-            try:
-                # MSG type 3 = airborne position (lat/lon present)
-                # MSG type 4 = airborne velocity (speed, heading, vrate)
-                # MSG type 1 = identification (callsign)
-                mtype = r[1]
-                lat = float(r[14]) if r[14] else None
-                lon = float(r[15]) if r[15] else None
-                alt = int(r[11]) if r[11] else 0
-                speed = int(float(r[12])) if r[12] else 0
-                heading = int(float(r[13])) if r[13] else 0
-                callsign = (r[10] or "").strip()
-            except (ValueError, IndexError):
-                continue
-            # Timestamp from columns 6/7 (msg gen date/time)
-            ts_str = _now_iso()
-            try:
-                if r[6] and r[7]:
-                    d = r[6].replace("/", "-")
-                    t = r[7].split(".")[0]
-                    ts_str = f"{d} {t}"
-            except Exception:
-                pass
-
-            entry = rows.setdefault(icao, {"icao": icao, "callsign": "",
-                                          "lat": None, "lon": None,
-                                          "alt_ft": 0, "speed_kt": 0,
-                                          "heading": 0, "first_seen": ts_str})
-            entry["first_seen"] = ts_str
-            if callsign:
-                entry["callsign"] = callsign
-            if lat is not None and lon is not None:
-                entry["lat"] = lat
-                entry["lon"] = lon
-            if alt:
-                entry["alt_ft"] = alt
-            if speed:
-                entry["speed_kt"] = speed
-            if heading:
-                entry["heading"] = heading
+            _ingest_sbs1_row(r, rows)
 
     out: dict[str, dict] = {}
     for icao, e in rows.items():
@@ -1797,6 +1807,155 @@ def watch_dir(watch_dir: Path, args) -> int:
         return 0
 
 
+# ── Live TCP stream (--stream) ──────────────────────────────────────────────
+# Direct alternative to `--watch`ing a directory that some other process
+# (dump1090 --net, ncat, a shell redirect) is writing SBS-1 lines into.
+# Connects straight to the receiver's SBS-1/BaseStation port (30003 by
+# default — dump1090's --net-sbs-port, readsb's equivalent) and ingests the
+# feed line-by-line as it arrives, instead of waiting on a poll interval
+# against a file on disk. Lower latency, one less moving part (no ncat/tee
+# needed), auto-reconnects with backoff if the receiver drops the link.
+#
+# Only SBS-1/BaseStation text is supported (line-oriented, trivial to
+# stream). Beast binary (port 30005) is a framed binary protocol and isn't
+# wired up here — file-based --watch + parse_beast remains the path for that.
+def _read_socket_lines(sock: socket.socket, idle_timeout: float):
+    """Yield decoded text lines from `sock` as they arrive. Yields None
+    (instead of raising) when `idle_timeout` seconds pass with no data, so
+    the caller can use the gap to flush on a schedule even during a lull
+    in traffic. Stops (generator return) when the peer closes the
+    connection."""
+    sock.settimeout(idle_timeout)
+    buf = b""
+    while True:
+        try:
+            chunk = sock.recv(4096)
+        except socket.timeout:
+            yield None
+            continue
+        if not chunk:
+            return  # peer closed
+        buf += chunk
+        while b"\n" in buf:
+            line, buf = buf.split(b"\n", 1)
+            yield line.decode("utf-8", errors="replace")
+
+
+def _flush_stream_records(rows: dict[str, dict], dirty: set[str],
+                          api_key: str | None, args) -> None:
+    """Normalise + emit whichever aircraft changed since the last flush.
+    Mirrors watch_dir's per-file write/upload step, but scoped to the
+    dirty set instead of a whole file's worth of records."""
+    if not dirty:
+        return
+    out: dict[str, dict] = {}
+    for icao in dirty:
+        e = rows.get(icao)
+        if not e:
+            continue
+        rec = _norm_record(icao=icao, callsign=e["callsign"],
+                          lat=e["lat"], lon=e["lon"],
+                          alt_ft=e["alt_ft"], speed_kt=e["speed_kt"],
+                          heading=e["heading"], first_seen=e["first_seen"])
+        if rec:
+            out[icao] = rec
+    records = list(out.values())
+    if not records:
+        return
+    print(f"[stream] flushing {len(records)} updated aircraft", file=sys.stderr)
+    if args.stdout:
+        print(json.dumps(_to_dump1090_fa(records), indent=2))
+    if not args.no_save and args.out_dir:
+        out_dir = Path(args.out_dir)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        out_path = out_dir / f"stream-{int(time.time())}.wdgwars.json"
+        out_path.write_text(json.dumps(_to_dump1090_fa(records), indent=2))
+    if args.upload:
+        rc = upload(records, api_key, args.api_url,
+                   batch_size=args.batch_size, dry_run=args.dry_run)
+        if rc != 0:
+            print(f"[stream]   upload failed for this batch — those aircraft "
+                  f"stay dirty and retry next flush", file=sys.stderr)
+            return
+    dirty.clear()
+
+
+def _parse_stream_target(spec: str) -> tuple[str, int]:
+    """Split a --stream value into (host, port), defaulting the port to
+    30003 (SBS-1/BaseStation) when omitted. Raises ValueError on a
+    non-numeric port or a missing host so callers can turn that into a
+    clean CLI error instead of a traceback."""
+    host, sep, port_s = spec.rpartition(":")
+    if not sep:
+        host, port_s = spec, "30003"
+    if not host:
+        raise ValueError(f"--stream requires a host, e.g. --stream 192.168.1.50:30003")
+    try:
+        port = int(port_s)
+    except ValueError:
+        raise ValueError(f"--stream port must be numeric, got {port_s!r}")
+    return host, port
+
+
+def stream_tcp(host: str, port: int, args) -> int:
+    """Connect directly to a live SBS-1/BaseStation TCP feed and upload
+    updates on a fixed cadence (--stream-interval), reconnecting with
+    backoff if the receiver drops the link. Runs until Ctrl+C."""
+    api_key = None
+    if args.upload:
+        api_key = load_key(args.key)
+        if not api_key:
+            print("\n[muninn] --upload was passed but no API key is configured.",
+                  file=sys.stderr)
+            rc = interactive_setup()
+            if rc != 0:
+                return rc
+            api_key = load_key(args.key)
+            if not api_key:
+                sys.exit("--upload requires an API key. Run with --setup, or "
+                         "drop --upload to just watch the stream locally.")
+
+    print(f"[stream] {host}:{port} (SBS-1/BaseStation), flushing every "
+          f"{args.stream_interval}s (Ctrl+C to stop)", file=sys.stderr)
+
+    rows: dict[str, dict] = {}
+    dirty: set[str] = set()
+    reconnect_delay = 2.0
+
+    try:
+        while True:
+            try:
+                print(f"[stream] connecting to {host}:{port} ...", file=sys.stderr)
+                with socket.create_connection((host, port), timeout=10) as sock:
+                    print("[stream] connected", file=sys.stderr)
+                    reconnect_delay = 2.0
+                    last_flush = time.monotonic()
+                    for line in _read_socket_lines(sock, args.stream_interval):
+                        if line:
+                            try:
+                                r = next(csv.reader([line]))
+                            except Exception:
+                                r = None
+                            if r:
+                                icao = _ingest_sbs1_row(r, rows)
+                                if icao:
+                                    dirty.add(icao)
+                        now = time.monotonic()
+                        if now - last_flush >= args.stream_interval:
+                            _flush_stream_records(rows, dirty, api_key, args)
+                            last_flush = now
+            except KeyboardInterrupt:
+                raise
+            except OSError as e:
+                print(f"[stream] connection error ({e}) — retrying in "
+                      f"{reconnect_delay:.0f}s", file=sys.stderr)
+                time.sleep(reconnect_delay)
+                reconnect_delay = min(reconnect_delay * 2, 60.0)
+    except KeyboardInterrupt:
+        print("\n[stream] stopped by user", file=sys.stderr)
+        return 0
+
+
 # ── Scheduling (--schedule / --unschedule) ─────────────────────────────────
 #
 # Two modes:
@@ -2584,7 +2743,6 @@ def _do_upload(records: list[dict], args) -> int:
 def _check_dump1090_net() -> None:
     if _QUIET:
         return
-    import socket
     PORTS = {
         30104: 'Beast input (--net-bi-port) -- accepts remote aircraft feeds',
         30001: 'raw input (--net-ri-port) -- accepts remote raw Mode-S',
@@ -2912,6 +3070,16 @@ def main() -> int:
     ap.add_argument("--watch-glob", default="*.txt",
                     help="glob pattern for files in the watched dir "
                          "(default: *.txt). Use '*' for everything.")
+    ap.add_argument("--stream", metavar="HOST[:PORT]",
+                    help="skip the file/--watch step entirely: connect "
+                         "directly to a live SBS-1/BaseStation TCP feed "
+                         "(e.g. your dump1090 box's IP) and upload updates "
+                         "as they arrive. Port defaults to 30003 if omitted. "
+                         "Lower latency than --watch, no ncat/tee needed. "
+                         "Runs until Ctrl+C; no input file/directory required.")
+    ap.add_argument("--stream-interval", type=int, default=5,
+                    help="seconds between upload flushes when --stream is "
+                         "set (default: 5)")
     ap.add_argument("--out", "-o", help="write JSON to this exact path "
                     "(default: <input>.wdgwars.json next to the input file)")
     ap.add_argument("--out-dir", metavar="DIR",
@@ -3030,6 +3198,14 @@ def main() -> int:
             sys.exit("no API key found — run `python3 muninn.py --setup` "
                      "for first-time setup")
         return check_whoami(key)
+
+    # Live TCP stream mode — no input file/directory needed at all.
+    if args.stream:
+        try:
+            host, port = _parse_stream_target(args.stream)
+        except ValueError as e:
+            ap.error(str(e))
+        return stream_tcp(host, port, args)
 
     # Zero-config mode: if user ran `python3 muninn.py` with no input,
     # use the saved input/output folders (prompts on first run to ask

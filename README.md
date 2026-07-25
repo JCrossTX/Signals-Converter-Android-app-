@@ -233,6 +233,24 @@ journalctl --user -u muninn-upload.timer -f
 
 ---
 
+## Live TCP stream (skip the file entirely)
+
+If your receiver serves a raw SBS-1/BaseStation feed on a TCP port (dump1090 `--net`'s port 30003, readsb's equivalent), Muninn can connect to it directly instead of watching a file that something else (ncat, a shell redirect) writes to disk:
+
+```bash
+./run.sh --stream 192.168.1.50:30003 --upload
+```
+
+- Port defaults to `30003` if you omit it (`--stream 192.168.1.50` works the same as `--stream 192.168.1.50:30003`).
+- Uploads flush every `--stream-interval` seconds (default 5), covering only the aircraft that changed since the last flush — not everything seen so far.
+- Auto-reconnects with backoff if the receiver drops the connection; whatever it had already decoded is kept in memory and flushed on the next successful reconnect.
+- Runs until Ctrl+C, same as `--watch`.
+- Combine with `--dry-run` to watch it decode without uploading, or `--stdout` to see the JSON on each flush.
+
+This is the same data `--watch`ing a directory of ncat-piped SBS-1 output gives you, just without the extra `ncat`/`tee` process and without waiting on a poll interval against a file. Only SBS-1/BaseStation text is supported this way (it's line-oriented and trivial to stream); Beast binary (port 30005) still needs the file-based `--watch` path.
+
+---
+
 ## Supported input formats
 
 Auto-detected from the first line of the file:
@@ -264,6 +282,10 @@ Notes on `.sqb`:
 --watch DIR        watch a folder; auto-convert (and upload) new files
 --watch-interval N seconds between watch polls (default: 30)
 --watch-glob G     glob for the watch dir (default: *.txt; use * for all)
+--stream HOST[:PORT]  connect directly to a live SBS-1/BaseStation TCP
+                   feed instead of watching a file (port defaults to
+                   30003). No input file/directory needed.
+--stream-interval N seconds between upload flushes for --stream (default: 5)
 --format FMT       force input format (auto|avr|sbs1|json|csv|mayhem|sqb)
 --csv-format COLS  column-order hint for generic CSV inputs
 --sqb-tz ZONE      IANA timezone for interpreting BaseStation .sqb
