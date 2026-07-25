@@ -13,8 +13,10 @@ import socket
 import sys
 import tempfile
 import threading
+import time
 import unittest
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
@@ -248,6 +250,91 @@ class RealCaptureParityTests(unittest.TestCase):
         self.assertEqual(set(streamed.keys()), set(from_file.keys()))
         for icao in from_file:
             self.assertEqual(streamed[icao], from_file[icao], f"mismatch for {icao}")
+
+
+def _free_port() -> int:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+
+
+class StreamTcpApiKeyTests(unittest.TestCase):
+    """The API-key resolution at the top of stream_tcp — runs before any
+    socket is touched, so it's cheap to exercise directly."""
+
+    def test_no_upload_flag_skips_key_resolution_entirely(self):
+        # --stream without --upload never even calls load_key; use a port
+        # nothing listens on so it fails fast into the reconnect branch,
+        # and break out via the same "sleep raises" technique as below.
+        args = _fake_stream_args(upload=False, stream_interval=0.05)
+        with mock.patch.object(muninn, "load_key") as m_load_key, \
+             mock.patch("time.sleep", side_effect=KeyboardInterrupt):
+            rc = muninn.stream_tcp("127.0.0.1", _free_port(), args)
+        m_load_key.assert_not_called()
+        self.assertEqual(rc, 0)
+
+    def test_upload_with_no_key_and_failed_interactive_setup_returns_rc(self):
+        args = _fake_stream_args(upload=True, key=None, stream_interval=5)
+        with mock.patch.object(muninn, "load_key", return_value=None), \
+             mock.patch.object(muninn, "interactive_setup", return_value=1) as m_setup:
+            rc = muninn.stream_tcp("127.0.0.1", 1, args)
+        m_setup.assert_called_once()
+        self.assertEqual(rc, 1)
+
+    def test_upload_with_no_key_after_successful_setup_still_exits(self):
+        # interactive_setup "succeeds" (rc=0) but the key still can't be
+        # loaded afterward (e.g. the user backed out of the key prompt) —
+        # stream_tcp must refuse to run uploads with no key at all.
+        args = _fake_stream_args(upload=True, key=None, stream_interval=5)
+        with mock.patch.object(muninn, "load_key", return_value=None), \
+             mock.patch.object(muninn, "interactive_setup", return_value=0):
+            with self.assertRaises(SystemExit):
+                muninn.stream_tcp("127.0.0.1", 1, args)
+
+
+class StreamTcpEndToEndTests(unittest.TestCase):
+    """Runs the real connect -> ingest -> flush -> reconnect path against
+    an actual local TCP server, rather than only its extracted helpers.
+    stream_tcp's outer loop runs until Ctrl+C by design, so there's no
+    natural stopping point for a test — the standard trick is to make the
+    reconnect-wait itself raise, which is exactly the same KeyboardInterrupt
+    a real Ctrl+C would deliver, just delivered deterministically instead
+    of relying on wall-clock timing."""
+
+    def test_connects_ingests_flushes_then_reconnect_wait_is_interrupted(self):
+        port = _free_port()
+        msg = ("MSG,3,1,1,A11111,1,2026/05/09,12:00:00.000,2026/05/09,"
+               "12:00:00.000,,30000,,,42.1,-81.1,,,,,,0\n")
+
+        def serve():
+            srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            srv.bind(("127.0.0.1", port))
+            srv.listen(1)
+            conn, _ = srv.accept()
+            conn.sendall(msg.encode())
+            # Event.wait(), not time.sleep() — this thread's timing must
+            # not be affected by the time.sleep mock scoped to the main
+            # thread below. Gives a --stream-interval flush time to fire
+            # (via an idle-timeout tick) before the connection closes.
+            threading.Event().wait(0.3)
+            conn.close()
+            srv.close()
+
+        t = threading.Thread(target=serve, daemon=True)
+        t.start()
+
+        uploaded = []
+        args = _fake_stream_args(upload=True, key="testkey", stream_interval=0.05)
+        with mock.patch.object(muninn, "upload",
+                              side_effect=lambda records, *a, **k: (uploaded.append(records) or 0)), \
+             mock.patch("time.sleep", side_effect=KeyboardInterrupt):
+            rc = muninn.stream_tcp("127.0.0.1", port, args)
+        t.join(timeout=5)
+
+        self.assertEqual(rc, 0)
+        self.assertEqual(len(uploaded), 1)
+        self.assertEqual(uploaded[0][0]["icao"], "A11111")
 
 
 class FlushStreamRecordsTests(unittest.TestCase):

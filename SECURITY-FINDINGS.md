@@ -47,6 +47,7 @@ next to the renderers). Regression tests are in
 | `python:S6350` | MAJOR | 2 | scheduler command argument | **Fixed** — quoting + glob validation |
 | `python:S8706` | MAJOR | 2 | `parse_sqb()` SQLite open | **Fixed** — URI-encoded read-only open |
 | `pythonsecurity:S8705` | MAJOR | 1 | OS command from path | **Fixed** — quoting (cron `shlex`, schtasks/systemd quote) |
+| `pythonsecurity:S8703` | MAJOR | 1 | `stream_tcp()` — `socket.create_connection` from `--stream` | **Accept-by-design** — see below |
 
 ## Per-rule detail
 
@@ -129,3 +130,26 @@ artifact or second-order path) and *accept-by-design with normalisation*
 now passes through a validation/normalisation choke point rather than going
 straight from argv to syscall.
 Tests: `UserPathTests`, `ControlCharTests` (plus the renderer suites above).
+
+### S8703 (MAJOR) — SSRF: `socket.create_connection` from `--stream` (added v2.1.0)
+**Flagged:** `stream_tcp()` opens a raw TCP connection to the host/port parsed
+from `--stream HOST[:PORT]` by `_parse_stream_target()`.
+
+**Accept-by-design**, same reasoning as `--out`/`--out-dir` under S8707 above:
+the address is not fetched from a remote source, not derived from another
+user's input, and not defaulted to anything reachable — it is typed on the
+command line by the same operator who is about to run the process. There is
+no privilege boundary to cross: an operator who wants Muninn to connect
+somewhere can already do so directly with `nc`/`ncat`/a one-line Python
+script. This is the exact same trust model as `--api-url` (also a raw
+user-supplied network destination, on the output side instead of the input
+side), which has never been flagged separately.
+
+What *is* hardened, because the other end of that connection is untrusted
+once the TCP handshake completes: `_read_socket_lines()` caps its line buffer
+at `_STREAM_MAX_LINE_BYTES` (64 KiB) so a peer that never sends a newline
+can't grow memory without bound, and each newline-delimited segment is
+length-checked before being handed to the CSV parser, not after — see the
+docstring on `_read_socket_lines` for why the ordering matters.
+Tests: `ReadSocketLinesTests`, `RealCaptureParityTests` in
+`tests/test_stream_tcp.py`.
