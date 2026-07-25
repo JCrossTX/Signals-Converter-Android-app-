@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Double-click: process any capture files in input/ and upload to WDGoWars.
+# Double-click: process any capture files in input/ and upload to WDGWars.
 # CLI:         forward any args to muninn.py through the venv interpreter.
 #
 # Examples:

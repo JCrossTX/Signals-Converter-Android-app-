@@ -232,7 +232,7 @@ class SqbInputTests(unittest.TestCase):
         # explicit --format override.
         records = muninn._convert_one(FIXTURE, None, None)
         self.assertEqual(len(records), 4)
-        # Every record carries the WDGoWars-required fields.
+        # Every record carries the WDGWars-required fields.
         for r in records:
             self.assertEqual(r["type"], "ADSB")
             self.assertEqual(len(r["icao"]), 6)

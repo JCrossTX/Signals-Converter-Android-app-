@@ -18,7 +18,7 @@ That's it — no arguments needed. Muninn picks up every supported file in this 
 - dump1090 `aircraft.json`
 - Generic CSV with `icao,lat,lon,...` columns
 
-Add `--upload` to push results to WDGoWars after conversion:
+Add `--upload` to push results to WDGWars after conversion:
 
 ```bash
 python3 muninn.py --upload

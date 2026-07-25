@@ -1,7 +1,7 @@
 """Muninn test suite.
 
 Safety net: refuse to start the test process if the user has a real
-WDGoWars API key configured on this host. Test code that exercises
+WDGWars API key configured on this host. Test code that exercises
 `--upload` or `--watch` reads the same key from `~/.config/muninn/api.key`
 as production runs do — so a stray test invocation on a developer
 workstation can post synthetic data to LOCOSP's prod. Happened once on
@@ -43,7 +43,7 @@ def _check_live_key_guard() -> None:
         " Tests that exercise --upload or --watch will read this key\n"
         " and post synthetic data to LOCOSP's production endpoint.\n"
         " This guard exists to keep test runs from accidentally\n"
-        " polluting your real WDGoWars account.\n"
+        " polluting your real WDGWars account.\n"
         "\n"
         " To run tests anyway (e.g. you're testing against a\n"
         " sacrificial account on purpose):\n"

@@ -5,7 +5,7 @@ Catches the post-v2.0.8 footgun where README code blocks still say
 `python3 muninn.py ...`. After v2.0.8, deps live in `.venv/`, so users
 following those examples hit `ModuleNotFoundError: No module named
 'gungnir'` (the Pi24 user did exactly this on 2026-06-01, surfaced in
-the WDGoWars Discord).
+the WDGWars Discord).
 
 What this checks:
 

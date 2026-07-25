@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Double-click (or run) this once to install dependencies and save your WDGoWars API key.
+# Double-click (or run) this once to install dependencies and save your WDGWars API key.
 # We refresh requirements.txt from GitHub first in case the local copy
 # in this clone/ZIP is stale relative to muninn.py's current dep list.
 #
@@ -84,7 +84,7 @@ echo "[3/4] Installing dependencies..."
 "$VENV_PY" -m pip install --upgrade -r requirements.txt
 
 echo
-echo "[4/4] Saving your WDGoWars API key..."
+echo "[4/4] Saving your WDGWars API key..."
 "$VENV_PY" muninn.py --setup
 
 echo

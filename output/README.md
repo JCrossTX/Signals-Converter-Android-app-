@@ -19,6 +19,6 @@ The output uses dump1090-fa / readsb shape:
 }
 ```
 
-That's the format the WDGoWars **web upload form** expects — drag-and-drop straight from here into the website.
+That's the format the WDGWars **web upload form** expects — drag-and-drop straight from here into the website.
 
 If you'd rather skip the drag-and-drop, run with `--upload` and Muninn sends everything for you over the API.

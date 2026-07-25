@@ -58,7 +58,7 @@ table. Stdlib only — `sqlite3` and `zoneinfo` are both built into Python
   drag-and-drop UI, that won't work — the web flavour (Pyodide) doesn't
   ship the parser. They need the CLI for `.sqb`.
 - The default UTC-timestamps assumption is the right call when uploading
-  to WDGoWars (the portal expects UTC), but the `first_seen` field will
+  to WDGWars (the portal expects UTC), but the `first_seen` field will
   be wrong by however many hours the receiver host was off UTC unless
   `--sqb-tz` is used.
 - The read-only URI (`file:...?mode=ro`) means it's safe to point muninn

@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/banner.png" alt="Muninn — Odin's memory-raven for the WDGoWars sky" width="100%"/>
+  <img src="assets/banner.png" alt="Muninn — Odin's memory-raven for the WDGWars sky" width="100%"/>
 </p>
 
 <p align="center">
@@ -12,19 +12,19 @@
 
 # Muninn
 
-Convert ADS-B capture files (HackRF H4M, dump1090 / readsb, tar1090, VirtualRadarServer, Stratux, Mode-S Beast, RTL-SDR, RTL1090, PortaPack Mayhem, GDL-90 cockpit receivers) to WDGoWars-compatible JSON and optionally upload them. Auto-detects 13 input dialects and decompresses gzipped chunks transparently.
+Convert ADS-B capture files (HackRF H4M, dump1090 / readsb, tar1090, VirtualRadarServer, Stratux, Mode-S Beast, RTL-SDR, RTL1090, PortaPack Mayhem, GDL-90 cockpit receivers) to WDGWars-compatible JSON and optionally upload them. Auto-detects 13 input dialects and decompresses gzipped chunks transparently.
 
 ## Family
 
-Sibling repos in the WDGoWars feeder family:
+Sibling repos in the WDGWars feeder family:
 
 - [Heimdall](https://github.com/Yggdrasil-AI-labs/meshcore-to-wdgwars) — MeshCore LoRa feeder
 - [wigle-to-wdgwars](https://github.com/Yggdrasil-AI-labs/wigle-to-wdgwars) — WiGLE Wi-Fi/BLE feeder
 - [gungnir](https://github.com/Yggdrasil-AI-labs/gungnir) — shared HMAC transport library
 - [wdgwars-api-tester](https://github.com/Yggdrasil-AI-labs/wdgwars-api-tester) — API surface probe
 
-> **Linked by WDGoWars as the recommended advanced converter.** The
-> WDGoWars portal includes a native importer for the common JSON
+> **Linked by WDGWars as the recommended advanced converter.** The
+> WDGWars portal includes a native importer for the common JSON
 > dialects (dump1090 / readsb / tar1090 / Stratux / VRS / Sleipnir)
 > and the SBS-1 / PortaPack Mayhem text formats — drag-and-drop a
 > file and it imports. For everything else — AVR raw Mode-S, Mode-S
@@ -37,7 +37,7 @@ Sibling repos in the WDGoWars feeder family:
 
 **Scope:** Muninn is for **data your own receiver captured**. Aggregator-API
 formats (OpenSky, FlightAware, ADS-B Exchange) are intentionally not
-supported — WDGoWars is a wardriving game, importing thousands of other
+supported — WDGWars is a wardriving game, importing thousands of other
 people's aircraft would defeat the contribution model. If your data
 came from a live SDR / Stratux / PortaPack you set up, you're in the
 right place.
@@ -168,11 +168,11 @@ Output goes next to the input file (`your-capture.wdgwars.json`).
 
 ---
 
-## Uploading to WDGoWars
+## Uploading to WDGWars
 
 Two options:
 
-**Option A — drag-and-drop the JSON into the website.** The `.wdgwars.json` Muninn writes is in the dump1090-fa format that the WDGoWars web upload form accepts. Just drag it from your output folder into the upload page.
+**Option A — drag-and-drop the JSON into the website.** The `.wdgwars.json` Muninn writes is in the dump1090-fa format that the WDGWars web upload form accepts. Just drag it from your output folder into the upload page.
 
 **Option B — let Muninn upload for you.** Add `--upload`:
 
@@ -180,9 +180,9 @@ Two options:
 ./run.sh --upload
 ```
 
-First time, Muninn asks for your WDGoWars API key (y/n prompt — local conversion works fine without one). The key is saved locally in mode `0600`, scrubbed from all error output, and sent over TLS 1.2+ with an HMAC-SHA256-signed envelope to `https://wdgwars.pl/endpoint/upload/` (a server-side alias of `/api/upload/` that bypasses Cloudflare's per-IP L7 rate-limit — see the v2.0.4 changelog). Force `/api/upload/` with `--api-url` if needed.
+First time, Muninn asks for your WDGWars API key (y/n prompt — local conversion works fine without one). The key is saved locally in mode `0600`, scrubbed from all error output, and sent over TLS 1.2+ with an HMAC-SHA256-signed envelope to `https://wdgwars.pl/endpoint/upload/` (a server-side alias of `/api/upload/` that bypasses Cloudflare's per-IP L7 rate-limit — see the v2.0.4 changelog). Force `/api/upload/` with `--api-url` if needed.
 
-Grab your API key from your WDGoWars profile page.
+Grab your API key from your WDGWars profile page.
 
 ---
 
@@ -306,7 +306,7 @@ Notes on `.sqb`:
 --out PATH         write JSON to one specific output path
 --out-dir DIR      write all output JSON into this folder (created if missing)
 --stdout           print JSON to stdout instead of writing a file
---upload           POST to WDGoWars after converting (HMAC-signed envelope)
+--upload           POST to WDGWars after converting (HMAC-signed envelope)
 --watch DIR        watch a folder; auto-convert (and upload) new files
 --watch-interval N seconds between watch polls (default: 30)
 --watch-glob G     glob for the watch dir (default: *.txt; use * for all)

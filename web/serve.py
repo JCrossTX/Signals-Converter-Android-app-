@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Muninn web — self-hosted server with WDGoWars upload proxy.
+Muninn web — self-hosted server with WDGWars upload proxy.
 
 The public GitHub Pages deploy can't direct-upload because wdgwars.pl's API
 doesn't return CORS headers. This script gives self-hosters a working path:

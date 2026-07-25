@@ -11,7 +11,7 @@
 #
 # Live `--schedule` install against the real systemd user manager is
 # NOT part of this script — it requires a clean host without a real
-# WDGoWars key, and a side-effecting systemctl --user environment.
+# WDGWars key, and a side-effecting systemctl --user environment.
 # That belongs in a pre-release manual checklist, not a script anyone
 # can run.
 #

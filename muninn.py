@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""muninn.py — convert ADS-B capture files to the WDGoWars aircraft
+"""muninn.py — convert ADS-B capture files to the WDGWars aircraft
 upload JSON, and optionally POST directly to the server.
 
-Linked by the WDGoWars portal as the recommended advanced converter
+Linked by the WDGWars portal as the recommended advanced converter
 for input formats outside the built-in importer's scope (AVR raw
 Mode-S, Mode-S Beast binary, GDL-90 binary, gzipped tar1090, NDJSON,
 BaseStation .sqb, and the HMAC-signed /api/upload/ route).
@@ -21,7 +21,7 @@ Auto-detects the input format from the first non-empty line:
                          in some order — configure with --csv-format if needed
 
 Each unique ICAO is kept once with its **most recent** position. Records
-missing lat/lon are dropped (WDGoWars rejects them server-side anyway).
+missing lat/lon are dropped (WDGWars rejects them server-side anyway).
 
 Output is a JSON array of:
   {"icao": "<UPPER 24-bit hex>",
@@ -350,7 +350,7 @@ $s.TargetPath = "cmd.exe"
 $s.Arguments = '/k "cd /d ""{script_dir}"" && ""{py}"" muninn.py & pause"'
 $s.WorkingDirectory = "{script_dir}"
 $s.IconLocation = "{ico}"
-$s.Description = "Muninn — ADS-B to WDGoWars converter"
+$s.Description = "Muninn — ADS-B to WDGWars converter"
 $s.Save()
 '''
     import subprocess
@@ -503,14 +503,14 @@ def interactive_setup() -> int:
     print(" muninn — API key setup", file=sys.stderr)
     print("─" * 60, file=sys.stderr)
     print("", file=sys.stderr)
-    print(" An API key is ONLY needed if you want to upload to WDGoWars.", file=sys.stderr)
+    print(" An API key is ONLY needed if you want to upload to WDGWars.", file=sys.stderr)
     print(" Local conversion to JSON works without one.", file=sys.stderr)
     print("", file=sys.stderr)
     print(" Get your key from: https://wdgwars.pl/  →  profile  →  API Key", file=sys.stderr)
     print(f" It will be saved to: {_key_path()}", file=sys.stderr)
     print("", file=sys.stderr)
 
-    if not _prompt_yes_no(" Set up your WDGoWars API key now?", default=True):
+    if not _prompt_yes_no(" Set up your WDGWars API key now?", default=True):
         print("", file=sys.stderr)
         print(" Skipped. You can run setup later with:", file=sys.stderr)
         print("   python3 muninn.py --setup", file=sys.stderr)
@@ -523,10 +523,10 @@ def interactive_setup() -> int:
             # Piped stdin (CI, testing) -> regular input (visible but works)
             if sys.stdin.isatty():
                 import getpass
-                key = getpass.getpass(" Paste your WDGoWars API key (hidden): ").strip()
+                key = getpass.getpass(" Paste your WDGWars API key (hidden): ").strip()
             else:
                 # Non-interactive: don't hang on getpass, just read a line
-                print(" Paste your WDGoWars API key: ", end="", flush=True,
+                print(" Paste your WDGWars API key: ", end="", flush=True,
                       file=sys.stderr)
                 key = sys.stdin.readline().strip()
         except (KeyboardInterrupt, EOFError):
@@ -689,7 +689,7 @@ def _now_iso() -> str:
 
 def _to_dump1090_fa(records: list[dict]) -> dict:
     """Wrap muninn's flat record list into dump1090-fa / readsb aircraft.json
-    shape. This is what the WDGoWars *web-form* upload accepts (drag-and-drop
+    shape. This is what the WDGWars *web-form* upload accepts (drag-and-drop
     of the .json file). The HMAC --upload path uses the flat list directly
     against /endpoint/upload/ (or /api/upload/) and does NOT use this format."""
     import time as _t
@@ -732,7 +732,7 @@ def _coerce_int(v) -> int:
 def _norm_record(icao: str, *, callsign: str = "", lat: float | None = None,
                  lon: float | None = None, alt_ft: int = 0, speed_kt: int = 0,
                  heading: int = 0, first_seen: str | None = None) -> dict | None:
-    """Build a record matching the WDGoWars aircraft schema. Drops the record
+    """Build a record matching the WDGWars aircraft schema. Drops the record
     if it lacks position."""
     if lat is None or lon is None:
         return None
@@ -1656,7 +1656,7 @@ def _ingest_csv_row(r: list[str], fields: list[str], rows: dict[str, dict]):
         entry["first_seen"] = first_seen
 
 
-# ── WDGoWars uploader ───────────────────────────────────────────────────────
+# ── WDGWars uploader ───────────────────────────────────────────────────────
 _USE_COLOR = sys.stderr.isatty() and os.environ.get("NO_COLOR") is None
 
 def _tag(label: str, code: str) -> str:
@@ -3053,7 +3053,7 @@ def _update_from_raw(script_dir: Path) -> int:
 def main() -> int:
     ap = argparse.ArgumentParser(
         description=f"Muninn v{__version__} — Convert ADS-B capture text files "
-                    f"to WDGoWars aircraft JSON, and optionally upload to wdgwars.pl.",
+                    f"to WDGWars aircraft JSON, and optionally upload to wdgwars.pl.",
         epilog="Format is auto-detected (AVR raw / SBS-1 / dump1090 JSON / "
                "generic CSV / PortaPack Mayhem / RTL1090 BaseStation .sqb). "
                "For generic CSV inputs, pass --csv-format to specify the "
@@ -3071,7 +3071,7 @@ def main() -> int:
                          "Unquoted paths with spaces are auto-joined.")
     ap.add_argument("--setup", action="store_true",
                     help="interactive first-time setup — prompts for your "
-                         "WDGoWars API key, validates it, saves it locally.")
+                         "WDGWars API key, validates it, saves it locally.")
     ap.add_argument("--save-key", metavar="KEY",
                     help="non-interactive: save the given API key to the user "
                          "config dir. Prefer --setup for first-time install.")
@@ -3151,7 +3151,7 @@ def main() -> int:
                          "Heimdall's --preview for cross-tool consistency.")
     ap.add_argument("--dry-run", action="store_true",
                     help="with --upload, build the request but don't send")
-    ap.add_argument("--key", help="WDGoWars API key (overrides $WDGWARS_API_KEY)")
+    ap.add_argument("--key", help="WDGWars API key (overrides $WDGWARS_API_KEY)")
     ap.add_argument("--api-url", default=DEFAULT_API_URL,
                     help=f"override upload endpoint (default: {DEFAULT_API_URL})")
     ap.add_argument("--batch-size", type=int, default=1000,

@@ -18,7 +18,7 @@
   - A raw TCP connection to whatever `--stream HOST[:PORT]` you pass — only when that flag is set, and only to the address you gave it. Muninn never scans, defaults to, or discovers a host on its own; if you don't pass `--stream`, no such connection is ever attempted.
 - ❌ **No `eval`, `exec`, `os.system`, or `shell=True` subprocess calls.** No command-injection paths.
 - ❌ **No remote code download/execution.** Pure stdlib + optional `pyModeS` (open-source, MIT, well-known in the ADS-B community).
-- ❌ **No data sent anywhere except WDGoWars when explicitly opted in via `--upload`.**
+- ❌ **No data sent anywhere except WDGWars when explicitly opted in via `--upload`.**
 
 ## API key handling
 
@@ -30,7 +30,7 @@
 
 ## What the API key can do
 
-The WDGoWars API key authorizes you to submit observations under your account. **If it leaks**, an attacker could:
+The WDGWars API key authorizes you to submit observations under your account. **If it leaks**, an attacker could:
 - Submit fake aircraft / WiFi / BLE captures under your name.
 - Read your account stats via `GET /api/me`.
 
@@ -39,7 +39,7 @@ It cannot (as far as we know):
 - Withdraw money / make purchases (there isn't any).
 - Affect other users' accounts.
 
-If you suspect your key has leaked, rotate it on the WDGoWars site and run `--save-key NEW_KEY` locally.
+If you suspect your key has leaked, rotate it on the WDGWars site and run `--save-key NEW_KEY` locally.
 
 ## Output file handling
 
@@ -83,9 +83,9 @@ Please do **not** post security issues to the public issue tracker. Aim is to gi
 | Watch state-file path traversal | The `.adsb-state.json` write is confined to the watched directory and refuses a symlinked state file (`_state_path_for`) |
 | `.sqb` filename overriding read-only DB open | SQLite opened via a `pathname2url`-encoded read-only URI (`_sqlite_ro_uri`), so a name like `x?mode=rwc.sqb` can't flip the mode |
 | Redirected decoder dir under world-writable `/tmp` | Symlinked candidate directories are excluded from suggestions (`_guess_decoder_dirs`) |
-| Replay attacks against WDGoWars | HMAC-SHA256-signed envelope with a `secrets.token_hex(8)` nonce per request — server rejects replays |
+| Replay attacks against WDGWars | HMAC-SHA256-signed envelope with a `secrets.token_hex(8)` nonce per request — server rejects replays |
 | Unintended uploads | `--upload` is **opt-in** only. Without it, the tool never makes network requests. |
-| Surveillance / telemetry | None. The tool only contacts WDGoWars when explicitly opted in. No analytics, no error reporting, no usage tracking. |
+| Surveillance / telemetry | None. The tool only contacts WDGWars when explicitly opted in. No analytics, no error reporting, no usage tracking. |
 
 A full review of the SonarCloud SAST findings against `muninn.py` — what was
 fixed, and what is accepted-by-design for a local operator CLI with the
@@ -94,6 +94,6 @@ reasoning — lives in [SECURITY-FINDINGS.md](SECURITY-FINDINGS.md).
 ## Things this tool does NOT defend against (out of scope)
 
 - Malware on the user's machine that can read `~/.config/muninn/api.key` (any malware running as your user can read this file — that's the OS's security boundary, not the tool's).
-- WDGoWars server compromise (the tool can only be as secure as the server it talks to).
+- WDGWars server compromise (the tool can only be as secure as the server it talks to).
 - Network DNS poisoning (TLS cert verification mitigates active MITM but a compromised CA could still be a problem).
 - Decoding accuracy / correctness — the tool does its best with `pyModeS`'s CPR decoder, but doesn't validate that the receiver itself wasn't fed bogus data.
