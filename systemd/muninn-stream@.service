@@ -1,0 +1,17 @@
+[Unit]
+Description=Muninn ADS-B --stream feed (%i)
+# managed-by-muninn
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# %i is the instance name after the @, e.g. `muninn-stream@192.168.1.50:30003.service`
+# feeds --stream 192.168.1.50:30003. Adjust the path below if you cloned
+# Muninn somewhere other than ~/code/adsb-to-wdgwars.
+ExecStart=%h/code/adsb-to-wdgwars/.venv/bin/python3 %h/code/adsb-to-wdgwars/muninn.py --stream %i --upload
+Restart=on-failure
+RestartSec=10s
+
+[Install]
+WantedBy=default.target

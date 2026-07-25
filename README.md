@@ -249,6 +249,34 @@ If your receiver serves a raw SBS-1/BaseStation feed on a TCP port (dump1090 `--
 
 This is the same data `--watch`ing a directory of ncat-piped SBS-1 output gives you, just without the extra `ncat`/`tee` process and without waiting on a poll interval against a file. Only SBS-1/BaseStation text is supported this way (it's line-oriented and trivial to stream); Beast binary (port 30005) still needs the file-based `--watch` path.
 
+### Multiple `--stream` feeds
+
+Each `muninn.py --stream` process handles exactly one TCP target — there's no
+multi-target flag. For more than one receiver, run one process per feed (same
+pattern as running Muninn on multiple hosts against multiple SDRs, just over
+sockets instead of files). `systemd/muninn-stream@.service` in this repo is an
+instantiated unit template that makes adding feeds a one-liner instead of
+hand-writing a new unit file each time:
+
+```bash
+cp systemd/muninn-stream@.service ~/.config/systemd/user/
+systemctl --user daemon-reload
+
+# One line per receiver — %i becomes the --stream target:
+systemctl --user enable --now muninn-stream@192.168.1.50:30003.service
+systemctl --user enable --now muninn-stream@10.0.0.12:30003.service
+```
+
+Edit the `ExecStart` path in the template first if Muninn isn't cloned at
+`~/code/adsb-to-wdgwars`. All instances upload under the same API key; the
+server dedupes overlapping coverage the same way it already does across
+separate hosts.
+
+This is a plain static template, not wired into `--schedule` — `--schedule`'s
+interactive/headless flow (watch/periodic modes) doesn't know about `--stream`
+yet, so there's no auto-generated-and-installed path for it. If that
+friction is worth removing later, that's a separate follow-up.
+
 ---
 
 ## Supported input formats

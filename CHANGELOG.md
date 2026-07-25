@@ -43,6 +43,10 @@ trailing `\r` glued onto each line before this fix.
 - `--stream HOST[:PORT]` — live TCP ingestion, no input file/directory required.
 - `--stream-interval N` — seconds between upload flushes (default: 5).
 - `--stream` port is validated to the 1–65535 range at parse time.
+- `systemd/muninn-stream@.service` — instantiated unit template for running
+  more than one `--stream` feed without hand-writing a unit per receiver
+  (`systemctl enable --now muninn-stream@<host:port>.service`). Static
+  template only, not wired into `--schedule` yet — see README.
 
 ### Fixed
 - `_read_socket_lines` bounds its buffer to `_STREAM_MAX_LINE_BYTES`
