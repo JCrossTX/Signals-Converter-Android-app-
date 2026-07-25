@@ -325,12 +325,14 @@ class StreamTcpEndToEndTests(unittest.TestCase):
         port = _free_port()
         msg = ("MSG,3,1,1,A11111,1,2026/05/09,12:00:00.000,2026/05/09,"
                "12:00:00.000,,30000,,,42.1,-81.1,,,,,,0\n")
+        listening = threading.Event()
 
         def serve():
             srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             srv.bind(("127.0.0.1", port))
             srv.listen(1)
+            listening.set()  # only now is the client's connect() guaranteed to land
             conn, _ = srv.accept()
             conn.sendall(msg.encode())
             # Event.wait(), not time.sleep() — this thread's timing must
@@ -343,6 +345,12 @@ class StreamTcpEndToEndTests(unittest.TestCase):
 
         t = threading.Thread(target=serve, daemon=True)
         t.start()
+        # Without this, the client's first socket.create_connection() can
+        # race the server thread's bind()/listen() on a loaded/slow CI
+        # runner and get ECONNREFUSED before anything is ever listening —
+        # which fed straight into the mocked-sleep KeyboardInterrupt exit
+        # with zero uploads (the exact flake this fixes).
+        self.assertTrue(listening.wait(5), "server never reached listen()")
 
         uploaded = []
         args = _fake_stream_args(upload=True, key="testkey", stream_interval=0.05)
