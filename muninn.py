@@ -1835,13 +1835,31 @@ def _read_socket_lines(sock: socket.socket, idle_timeout: float):
     handed to the caller — otherwise a peer that never sends a newline
     (garbage, or a malicious host, since --stream takes an arbitrary
     user-supplied address) would grow the buffer without bound for the
-    life of the connection."""
+    life of the connection.
+
+    Any unterminated bytes still sitting in the buffer are also dropped
+    the moment an idle gap occurs, even if they're under that size cap —
+    a real SBS-1 line completes promptly, so anything left over after a
+    full idle_timeout is a torn/stale fragment, not a line-in-progress.
+    Without this, a small leftover remainder could sit unresolved across
+    an idle gap and end up glued onto the front of the next real line
+    once one finally arrives."""
     sock.settimeout(idle_timeout)
     buf = b""
     while True:
         try:
             chunk = sock.recv(4096)
         except socket.timeout:
+            if buf:
+                # A real SBS-1 line completes promptly; anything still
+                # sitting unterminated after a full idle gap is a torn or
+                # stale fragment, not a line-in-progress. Drop it — a
+                # complete line arriving after the gap must never have
+                # this glued onto its front.
+                print(f"[stream] WARNING: discarding {len(buf)} buffered "
+                      f"byte(s) with no newline after an idle gap",
+                      file=sys.stderr)
+                buf = b""
             yield None
             continue
         if not chunk:

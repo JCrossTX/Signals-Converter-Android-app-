@@ -186,6 +186,26 @@ class ReadSocketLinesTests(unittest.TestCase):
             a.close()
             b.close()
 
+    def test_idle_gap_discards_leftover_sub_cap_fragment(self):
+        """A newline-less fragment that's UNDER _STREAM_MAX_LINE_BYTES (so
+        the size-cap branch never fires) must still be discarded once an
+        idle gap passes — otherwise it sits in the buffer indefinitely and
+        gets glued onto whichever real line shows up next, no matter how
+        much later that is. This is the exact bug a flaky run of
+        test_recovers_cleanly_once_oversized_junk_stops caught: a leftover
+        remainder from the junk run, still under the cap, survived an
+        observed idle gap and merged with the next real line."""
+        a, b = socket.socketpair()
+        try:
+            gen = muninn._read_socket_lines(b, idle_timeout=0.2)
+            a.sendall(b"xxxxx")  # well under the cap, no newline
+            self.assertIsNone(next(gen))  # idle gap — fragment must be dropped here
+            a.sendall(b"MSG,1,1,1,CCCCCC,1,x,y\n")
+            self.assertEqual(next(gen), "MSG,1,1,1,CCCCCC,1,x,y")
+        finally:
+            a.close()
+            b.close()
+
     def test_strips_trailing_cr_for_crlf_feeds(self):
         """Some dump1090/readsb builds emit CRLF line endings (confirmed —
         see the real capture in examples/sbs1_real.txt). A trailing \\r
