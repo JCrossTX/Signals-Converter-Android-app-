@@ -1819,12 +1819,23 @@ def watch_dir(watch_dir: Path, args) -> int:
 # Only SBS-1/BaseStation text is supported (line-oriented, trivial to
 # stream). Beast binary (port 30005) is a framed binary protocol and isn't
 # wired up here — file-based --watch + parse_beast remains the path for that.
+_STREAM_MAX_LINE_BYTES = 65536  # SBS-1 lines are ~100 bytes; this is generous
+
+
 def _read_socket_lines(sock: socket.socket, idle_timeout: float):
     """Yield decoded text lines from `sock` as they arrive. Yields None
     (instead of raising) when `idle_timeout` seconds pass with no data, so
     the caller can use the gap to flush on a schedule even during a lull
     in traffic. Stops (generator return) when the peer closes the
-    connection."""
+    connection.
+
+    Each newline-delimited segment is length-checked *before* it's
+    yielded: a well-behaved SBS-1 feed never gets remotely close to
+    _STREAM_MAX_LINE_BYTES, so a segment that long is dropped rather than
+    handed to the caller — otherwise a peer that never sends a newline
+    (garbage, or a malicious host, since --stream takes an arbitrary
+    user-supplied address) would grow the buffer without bound for the
+    life of the connection."""
     sock.settimeout(idle_timeout)
     buf = b""
     while True:
@@ -1836,9 +1847,24 @@ def _read_socket_lines(sock: socket.socket, idle_timeout: float):
         if not chunk:
             return  # peer closed
         buf += chunk
-        while b"\n" in buf:
-            line, buf = buf.split(b"\n", 1)
-            yield line.decode("utf-8", errors="replace")
+        while True:
+            idx = buf.find(b"\n")
+            if idx == -1:
+                break
+            if idx > _STREAM_MAX_LINE_BYTES:
+                print(f"[stream] WARNING: dropping a {idx}-byte line "
+                      f"(over the {_STREAM_MAX_LINE_BYTES}-byte limit) — "
+                      f"not a well-formed SBS-1 feed?", file=sys.stderr)
+            else:
+                line = buf[:idx]
+                if line.endswith(b"\r"):  # CRLF emitters (some dump1090 builds)
+                    line = line[:-1]
+                yield line.decode("utf-8", errors="replace")
+            buf = buf[idx + 1:]
+        if len(buf) > _STREAM_MAX_LINE_BYTES:
+            print(f"[stream] WARNING: {len(buf)} bytes with no newline yet — "
+                  f"dropping, not a well-formed SBS-1 feed?", file=sys.stderr)
+            buf = b""
 
 
 def _flush_stream_records(rows: dict[str, dict], dirty: set[str],
@@ -1894,6 +1920,8 @@ def _parse_stream_target(spec: str) -> tuple[str, int]:
         port = int(port_s)
     except ValueError:
         raise ValueError(f"--stream port must be numeric, got {port_s!r}")
+    if not (0 < port < 65536):
+        raise ValueError(f"--stream port must be between 1 and 65535, got {port}")
     return host, port
 
 
@@ -1920,7 +1948,7 @@ def stream_tcp(host: str, port: int, args) -> int:
 
     rows: dict[str, dict] = {}
     dirty: set[str] = set()
-    reconnect_delay = 2.0
+    RECONNECT_DELAY = 2.0  # flat retry — this is a local receiver, not a flaky WAN
 
     try:
         while True:
@@ -1928,7 +1956,6 @@ def stream_tcp(host: str, port: int, args) -> int:
                 print(f"[stream] connecting to {host}:{port} ...", file=sys.stderr)
                 with socket.create_connection((host, port), timeout=10) as sock:
                     print("[stream] connected", file=sys.stderr)
-                    reconnect_delay = 2.0
                     last_flush = time.monotonic()
                     for line in _read_socket_lines(sock, args.stream_interval):
                         if line:
@@ -1944,13 +1971,10 @@ def stream_tcp(host: str, port: int, args) -> int:
                         if now - last_flush >= args.stream_interval:
                             _flush_stream_records(rows, dirty, api_key, args)
                             last_flush = now
-            except KeyboardInterrupt:
-                raise
             except OSError as e:
                 print(f"[stream] connection error ({e}) — retrying in "
-                      f"{reconnect_delay:.0f}s", file=sys.stderr)
-                time.sleep(reconnect_delay)
-                reconnect_delay = min(reconnect_delay * 2, 60.0)
+                      f"{RECONNECT_DELAY:.0f}s", file=sys.stderr)
+                time.sleep(RECONNECT_DELAY)
     except KeyboardInterrupt:
         print("\n[stream] stopped by user", file=sys.stderr)
         return 0

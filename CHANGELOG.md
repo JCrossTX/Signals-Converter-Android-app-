@@ -23,9 +23,33 @@ Only SBS-1/BaseStation (line-oriented text) is supported this way.
 Beast binary (port 30005) is a framed binary protocol and stays on the
 file-based `--watch` + `parse_beast` path.
 
+Hardened before release: `--stream` accepts a TCP target the user
+supplies directly (same trust model as `--api-url`, no scanning or
+discovery), but a line-buffering bug meant a peer that never sent a
+newline could grow memory unbounded, and — the subtler case — a huge
+newline-less run capped by a naive post-hoc check could still leak
+through as one giant garbled line if a newline happened to arrive in
+the same read that crossed the cap. Fixed by length-checking each
+newline-delimited segment *before* deciding to yield it, so an
+oversized segment is dropped outright, never handed to the caller.
+Verified against a real 1940-line dump1090 SBS-1 capture
+(`examples/sbs1_real.txt`) streamed through the exact socket
+line-reader in small, line-boundary-misaligned chunks and compared
+byte-for-byte against `parse_sbs1()`'s output on the same file — which
+also caught a second real bug: the fixture's CRLF endings left a
+trailing `\r` glued onto each line before this fix.
+
 ### Added
 - `--stream HOST[:PORT]` — live TCP ingestion, no input file/directory required.
 - `--stream-interval N` — seconds between upload flushes (default: 5).
+- `--stream` port is validated to the 1–65535 range at parse time.
+
+### Fixed
+- `_read_socket_lines` bounds its buffer to `_STREAM_MAX_LINE_BYTES`
+  (64 KiB) and strips a trailing `\r` for CRLF-emitting feeds.
+- `tests/test_stream_tcp.py::RealCaptureParityTests` — streams a real
+  capture through the socket path and diffs it against the file-based
+  parser to keep the two in lockstep.
 
 ## [2.0.17] - 2026-07-23 - Generic CSV: stop letting a degraded row clobber good data
 

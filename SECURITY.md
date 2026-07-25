@@ -3,7 +3,7 @@
 ## What this tool does
 
 - Reads a local ADS-B text file (or every supported file in a chosen folder).
-- With `--stream HOST[:PORT]` (v2.1.0+), instead connects directly to a TCP address **you supply on the command line** and reads a live SBS-1/BaseStation feed from it — no file involved. The host/port is never inferred, guessed, or pulled from anywhere but that flag; this is the same trust model as `--api-url`, just for the input side instead of the output side.
+- With `--stream HOST[:PORT]` (v2.1.0+), instead connects directly to a TCP address **you supply on the command line** and reads a live SBS-1/BaseStation feed from it — no file involved. The host/port is never inferred, guessed, or pulled from anywhere but that flag; this is the same trust model as `--api-url`, just for the input side instead of the output side. Whatever is on the other end of that connection is treated as untrusted input: the line buffer is capped at 64 KiB (a real SBS-1 line is ~100 bytes), so a peer that never sends a newline can't grow Muninn's memory without bound.
 - Decodes aircraft records.
 - Writes a JSON output file next to the input, or in the configured output folder.
 - Optionally POSTs the records to `https://wdgwars.pl/endpoint/upload/` (the server's Cloudflare-friendly alias of `/api/upload/`, default since v2.0.4; configurable).
