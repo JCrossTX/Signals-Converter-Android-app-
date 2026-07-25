@@ -1,5 +1,5 @@
 @echo off
-REM Double-click this once to install dependencies and save your WDGoWars API key.
+REM Double-click this once to install dependencies and save your WDGWars API key.
 REM We refresh requirements.txt from GitHub first in case the local copy
 REM in this ZIP is stale relative to muninn.py's current dep list.
 
@@ -34,7 +34,7 @@ if errorlevel 1 (
 )
 
 echo.
-echo [3/3] Saving your WDGoWars API key...
+echo [3/3] Saving your WDGWars API key...
 python "%~dp0muninn.py" --setup
 
 :done

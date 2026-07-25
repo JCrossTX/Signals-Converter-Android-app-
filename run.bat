@@ -1,5 +1,5 @@
 @echo off
-REM Double-click: process any capture files in input/ and upload to WDGoWars.
+REM Double-click: process any capture files in input/ and upload to WDGWars.
 REM CLI:         forward any args to muninn.py.
 REM
 REM Examples:
