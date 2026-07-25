@@ -51,6 +51,10 @@ trailing `\r` glued onto each line before this fix.
 ### Fixed
 - `_read_socket_lines` bounds its buffer to `_STREAM_MAX_LINE_BYTES`
   (64 KiB) and strips a trailing `\r` for CRLF-emitting feeds.
+- `_read_socket_lines` also discards any unterminated buffer on an idle
+  gap, not just when it crosses the size cap — a leftover fragment under
+  the cap could otherwise sit unresolved across an idle gap and end up
+  glued onto the front of the next real line once one finally arrived.
 - `tests/test_stream_tcp.py::RealCaptureParityTests` — streams a real
   capture through the socket path and diffs it against the file-based
   parser to keep the two in lockstep.
