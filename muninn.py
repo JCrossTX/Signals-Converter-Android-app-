@@ -54,7 +54,7 @@ License: MIT
 """
 from __future__ import annotations
 
-__version__ = "2.1.0"
+__version__ = "2.1.1"
 GITHUB_REPO = "Yggdrasil-AI-labs/adsb-to-wdgwars"
 GITHUB_URL = f"https://github.com/{GITHUB_REPO}"
 
@@ -87,6 +87,7 @@ def _open_folder(p) -> bool:
 
 import argparse
 import csv
+import getpass
 import json
 import logging
 import os
@@ -522,7 +523,6 @@ def interactive_setup() -> int:
             # Interactive TTY -> hidden input via getpass
             # Piped stdin (CI, testing) -> regular input (visible but works)
             if sys.stdin.isatty():
-                import getpass
                 key = getpass.getpass(" Paste your WDGWars API key (hidden): ").strip()
             else:
                 # Non-interactive: don't hang on getpass, just read a line
@@ -2115,6 +2115,118 @@ def _schedule_mechanism() -> str:
     return "cron"
 
 
+# ── Reboot-survival check: systemd user lingering ──────────────────────────
+#
+# systemd --user units (what install_systemd_user just enabled) only keep
+# running while the owning user has an active login session. Without
+# "lingering" enabled for that user, a reboot or even a plain logout stops
+# muninn-upload.timer/.service with no error anywhere — the decoder is a
+# separate system service and keeps running, so its web map keeps showing
+# planes, making the loss of uploads invisible until someone checks the
+# server side. This was found live on 2026-07-25 the hard way.
+#
+# The check/enable step below must never claim success it hasn't verified:
+# `loginctl enable-linger` returning 0 is not proof the property actually
+# flipped (polkit can silently no-op it on some setups), so every path that
+# reports success re-queries `--property=Linger` first. Every failure path
+# (loginctl missing, query ambiguous, enable-linger non-zero, enable-linger
+# "succeeded" but didn't verify) prints a loud, explicit warning with the
+# exact `sudo` command to run — reproducing the silent-failure bug this
+# exists to fix would defeat the point of writing it.
+
+def _linger_state(user: str) -> str | None:
+    """Query current systemd lingering state for `user`.
+
+    Returns "yes" or "no" when the property was read unambiguously, or
+    None if it couldn't be determined (loginctl missing, non-zero exit,
+    unexpected output). Never raises."""
+    try:
+        r = subprocess.run(["loginctl", "show-user", user,
+                            "--property=Linger"],
+                           capture_output=True, text=True)
+    except FileNotFoundError:
+        return None
+    if r.returncode != 0:
+        return None
+    m = _re.match(r"^Linger=(yes|no)\s*$", r.stdout.strip())
+    return m.group(1) if m else None
+
+
+def _warn_linger_not_verified(user: str, reason: str) -> None:
+    """Loud, unmissable warning: the schedule is NOT yet reboot-safe."""
+    print("", file=sys.stderr)
+    print("!" * 60, file=sys.stderr)
+    print(" WARNING: systemd lingering is NOT enabled for this account.",
+          file=sys.stderr)
+    print(f" {reason}", file=sys.stderr)
+    print(" Without it, the schedule you just installed will stop running",
+          file=sys.stderr)
+    print(" the next time you log out or reboot — silently. The decoder is",
+          file=sys.stderr)
+    print(" a separate service and keeps running, so its map will keep",
+          file=sys.stderr)
+    print(" showing planes even though uploads have stopped.", file=sys.stderr)
+    print(" Fix it by running this once (needs root):", file=sys.stderr)
+    print(f"   sudo loginctl enable-linger {user}", file=sys.stderr)
+    print("!" * 60, file=sys.stderr)
+    print("", file=sys.stderr)
+
+
+def ensure_linger_enabled() -> bool:
+    """Best-effort: make sure this user's systemd units survive reboot.
+
+    Called right after install_systemd_user enables the unit. Never
+    prompts for or invokes sudo — attempts the unprivileged call (polkit
+    allows this on some systems) and, on failure, prints the exact `sudo`
+    command instead. Returns True only when lingering was verified enabled
+    (already-on or freshly re-queried after enabling); False in every other
+    case, including when the attempt to enable it reported success but a
+    re-check couldn't confirm it.
+    """
+    user = getpass.getuser()
+    if shutil.which("loginctl") is None:
+        _warn_linger_not_verified(
+            user, "loginctl not found (no systemd-logind on this system);")
+        return False
+
+    state = _linger_state(user)
+    if state == "yes":
+        print(f"[schedule] linger already enabled for {user} — this "
+              f"schedule will survive logout/reboot.", file=sys.stderr)
+        return True
+    if state is None:
+        _warn_linger_not_verified(
+            user, "could not read the current linger state via loginctl;")
+        return False
+
+    # state == "no": attempt to enable it ourselves, unprivileged. Some
+    # systems' polkit policy lets a user do this for their own account;
+    # others require root, in which case this fails and we say so.
+    try:
+        attempt = subprocess.run(["loginctl", "enable-linger", user],
+                                 capture_output=True, text=True)
+    except FileNotFoundError:
+        _warn_linger_not_verified(
+            user, "loginctl disappeared while attempting to enable linger;")
+        return False
+
+    # Never trust the exit code alone — re-query the property, since this
+    # is exactly the kind of step that must not report success it hasn't
+    # verified.
+    verified = _linger_state(user)
+    if verified == "yes":
+        print(f"[schedule] enabled linger for {user} — this schedule will "
+              f"survive logout/reboot.", file=sys.stderr)
+        return True
+
+    detail = (attempt.stderr.strip() if attempt.stderr and
+              attempt.stderr.strip() else f"exit code {attempt.returncode}")
+    _warn_linger_not_verified(
+        user, f"`loginctl enable-linger {user}` did not take effect "
+              f"({detail});")
+    return False
+
+
 # ── Pure renderers (no side effects, tested in isolation) ──────────────────
 
 def _systemd_quote(value) -> str:
@@ -2337,6 +2449,10 @@ def install_systemd_user(mode: str, input_dir: Path, glob: str,
           file=sys.stderr)
     print(f"[schedule] logs:   journalctl --user -u {target} -f",
           file=sys.stderr)
+    # The unit is enabled and running right now, but systemd --user units
+    # don't survive logout/reboot without lingering — check/enable it so
+    # this schedule doesn't silently die the next time the host restarts.
+    ensure_linger_enabled()
     return 0
 
 

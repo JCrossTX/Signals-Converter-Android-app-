@@ -4,6 +4,43 @@ All notable changes to Muninn are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [2.1.1] - 2026-07-25 - `--schedule` now checks/enables systemd lingering
+
+Bug-fix release. Found live: a user set up `--schedule` on a headless Linux
+box, and the honest answer to "what do I run after a power cut?" turned out
+to be "nothing — your uploads already stopped." `--schedule`'s systemd path
+installs and enables a **user** unit (`muninn-upload.service`/`.timer`), which
+looks correct and works immediately — but systemd user units only keep
+running while the installing user has an active login session. Without
+lingering enabled, a reboot or even a plain logout stops the unit with no
+error anywhere. The decoder is a separate system service and keeps running,
+so its web map keeps showing planes — from the outside everything looks
+healthy while nothing is actually being uploaded.
+
+### Fixed
+
+- On the systemd branch of `--schedule` (both interactive and headless,
+  `cmd_schedule_headless`), right after the unit is enabled, Muninn now
+  checks `loginctl show-user <user> --property=Linger` and, if it isn't
+  already `yes`, attempts `loginctl enable-linger <user>` itself
+  (unprivileged — some systems' polkit policy allows this for the user's
+  own account). It never prompts for or invokes `sudo`. Success is never
+  reported on the enable command's exit code alone — the property is
+  re-queried afterward, since a silent no-op here would just reproduce the
+  bug this exists to fix. If the attempt fails, or `loginctl` doesn't exist
+  on this system (no systemd-logind), Muninn prints a loud warning
+  explaining exactly what will break and the exact `sudo loginctl
+  enable-linger <user>` command to run.
+- cron and Windows `schtasks` scheduling are unaffected — this only touches
+  the systemd branch.
+
+### Added
+
+- `tests/test_scheduler.py::LingerTests` — already-enabled (no-op),
+  successful unprivileged enable, failed enable producing the warning, and
+  `loginctl` missing entirely. All subprocess calls are mocked; no real
+  `loginctl` is ever invoked by the suite.
+
 ## [2.1.0] - 2026-07-25 - Live TCP stream ingestion (`--stream`)
 
 Feature release. Until now, feeding Muninn from a live SBS-1/BaseStation

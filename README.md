@@ -231,6 +231,18 @@ systemctl --user status muninn-upload.timer
 journalctl --user -u muninn-upload.timer -f
 ```
 
+### Reboot survival (systemd lingering)
+
+Systemd **user** units — the kind `--schedule` installs on Linux — only run while the installing user has an active login session. Without something extra, a reboot or even a plain logout stops `muninn-upload.timer`/`.service` with no error anywhere. The decoder is a separate system service and keeps running, so its web map keeps showing planes — from the outside everything looks healthy while nothing is actually being uploaded anymore.
+
+To prevent that, right after enabling the unit `--schedule` (interactive and headless alike) checks `loginctl show-user <user> --property=Linger` and, if lingering isn't already on, attempts `loginctl enable-linger <user>` itself. Some systems let a user enable their own lingering unprivileged via polkit; others require root. Muninn never prompts for or runs `sudo` itself — if the unprivileged attempt fails, or `loginctl`/`systemd-logind` isn't present at all, it prints a loud warning and the exact command to run yourself:
+
+```bash
+sudo loginctl enable-linger <user>
+```
+
+It never reports lingering as enabled without re-checking the property afterward — an unverified success here would just reproduce the exact bug this exists to prevent. Re-run `--schedule` at any point to re-check. `--unschedule` only removes the unit files; it does not touch lingering.
+
 ---
 
 ## Live TCP stream (skip the file entirely)
