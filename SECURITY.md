@@ -43,9 +43,10 @@ If you suspect your key has leaked, rotate it on the WDGWars site and run `--sav
 
 ## Output file handling
 
-- The default output path (`<input>.wdgwars.json`) is always written **next to the input file**. Both paths are resolved with `Path.resolve()` and printed as absolute paths.
+- Resolution order for `<stem>.wdgwars.json`: `--out` (exact path) > `--out-dir` (a folder) > the output folder saved by the first-run prompt / `--setup`, if any > **next to the input file**, as the last resort (added v2.1.2 — see CHANGELOG; previously an explicit input path always used this last-resort tier, even when a folder was configured). Every resolved path is passed through `Path.resolve()` and printed as an absolute path.
 - If `--out PATH` is passed, **the tool writes to exactly that path**. No path-traversal sandboxing — you decide where it goes. Be careful not to point `--out` at something important.
 - Existing files at the output path are **overwritten without warning**. Run with `--stdout` first if you want to preview.
+- A failed local write (most commonly `PermissionError` when pointed at a decoder's root-owned runtime directory, e.g. `/run/readsb`) never produces a traceback and never aborts an in-flight `--upload` — the local file is a side artifact of the audit trail, not the point of `--upload`. It only becomes a hard failure when `--upload` was not requested, since in that case the write was the entire point of the run (v2.1.2, `_write_local_output`).
 
 ## Watch mode
 

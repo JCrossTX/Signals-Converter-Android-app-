@@ -54,7 +54,7 @@ License: MIT
 """
 from __future__ import annotations
 
-__version__ = "2.1.1"
+__version__ = "2.1.2"
 GITHUB_REPO = "Yggdrasil-AI-labs/adsb-to-wdgwars"
 GITHUB_URL = f"https://github.com/{GITHUB_REPO}"
 
@@ -2804,9 +2804,73 @@ def cmd_unschedule() -> int:
 
 
 # ── CLI ─────────────────────────────────────────────────────────────────────
+def _default_out_dir_from_prefs() -> Path | None:
+    """The user's configured output folder, if one was ever saved (first-run
+    folder prompt, ``--config`` shows it). None if never configured.
+
+    Second-to-last tier of output-path resolution in ``_process_one_file``:
+    ``--out`` > ``--out-dir`` > this > beside the input file. Before v2.1.2
+    an explicit input path skipped straight to "beside the input", ignoring
+    a configured output folder entirely — see CHANGELOG v2.1.2.
+    """
+    prefs = _load_folder_prefs()
+    if prefs and prefs.get("output"):
+        return Path(prefs["output"])
+    return None
+
+
+def _write_local_output(out_path: Path, payload: dict, *,
+                        upload_requested: bool) -> bool:
+    """Write the local ``.wdgwars.json`` side artifact. Returns True on
+    success, False (after printing a plain-language explanation) on failure.
+
+    Added v2.1.2 after a live bug report: a decoder's own runtime dir
+    (``/run/readsb``, ``/run/dump1090-fa``) is root-owned tmpfs the feeder
+    account can't write to, and that is exactly where ``_guess_decoder_dirs``
+    points people and where the README's own one-shot example runs against.
+    Two rules follow from that:
+
+    1. Never let this surface a raw traceback — the person hitting a
+       ``PermissionError`` here is following documented steps, not
+       debugging Python.
+    2. Never let this abort an ``--upload``. The local JSON is a side
+       artifact of the audit trail; the upload is the actual point of the
+       run. A user who can't write locally but CAN reach the network should
+       still get their data uploaded, with a loud warning about the local
+       copy — not a failed run.
+    """
+    hint = ("Point --out-dir at a folder you can write to, or clear the "
+            "saved folder choice with --reset and pick a writable one next "
+            "run.")
+    try:
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text(json.dumps(payload, indent=2))
+        return True
+    except PermissionError:
+        reason = "not writable (permission denied)"
+    except OSError as e:
+        reason = str(e) or e.__class__.__name__
+
+    if upload_requested:
+        print(f"[muninn] WARNING: could not write local output to "
+              f"{out_path} -- {reason}. Continuing to upload anyway since "
+              f"--upload was requested; the local JSON file is only a side "
+              f"artifact. {hint}", file=sys.stderr)
+    else:
+        print(f"[muninn] ERROR: could not write output to {out_path} -- "
+              f"{reason}. {hint}", file=sys.stderr)
+    return False
+
+
 def _process_one_file(path: Path, args) -> tuple[int, list[dict]]:
     """Decode a single capture file and write its JSON output.
-    Returns (exit_code, records). Does NOT upload — caller decides."""
+    Returns (exit_code, records). Does NOT upload — caller decides.
+
+    A failed local write only turns into exit_code 1 (no records) when
+    ``args.upload`` is False — the local file was the whole point of that
+    run. When ``args.upload`` is True, records are always returned on rc 0
+    even if the local write failed, so the caller still uploads (see
+    _write_local_output)."""
     fmt = args.format if args.format != "auto" else detect_format(path)
     if not _QUIET:
         print(f"[muninn] detected format: {fmt}", file=sys.stderr)
@@ -2866,15 +2930,29 @@ def _process_one_file(path: Path, args) -> tuple[int, list[dict]]:
     elif args.upload and args.no_save:
         out_path = None
     else:
-        out_path = (path.parent / f"{path.stem}.wdgwars.json").resolve()
+        # Last two tiers: the user's configured output folder (if they ever
+        # set one), else beside the input as the final fallback. An explicit
+        # input path used to skip straight past the configured folder to
+        # "beside the input" — see _default_out_dir_from_prefs.
+        configured = _default_out_dir_from_prefs()
+        if configured is not None:
+            out_path = (configured / f"{path.stem}.wdgwars.json").resolve()
+        else:
+            out_path = (path.parent / f"{path.stem}.wdgwars.json").resolve()
 
     if out_path is not None:
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        out_path.write_text(json.dumps(web_payload, indent=2))
-        _OUT_DIRS_WRITTEN.add(out_path.parent.resolve())
-        if not _QUIET:
-            print(f"[muninn] OK -- wrote {len(records)} aircraft to:\n"
-                  f"       {out_path}", file=sys.stderr)
+        wrote = _write_local_output(out_path, web_payload,
+                                    upload_requested=bool(args.upload))
+        if wrote:
+            _OUT_DIRS_WRITTEN.add(out_path.parent.resolve())
+            if not _QUIET:
+                print(f"[muninn] OK -- wrote {len(records)} aircraft to:\n"
+                      f"       {out_path}", file=sys.stderr)
+        elif not args.upload:
+            # No --upload means the local write WAS the entire point of
+            # this run. Fail loudly and cleanly (message already printed
+            # by _write_local_output) rather than reporting success.
+            return 1, records
 
     return 0, records
 

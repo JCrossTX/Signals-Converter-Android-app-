@@ -4,6 +4,71 @@ All notable changes to Muninn are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [2.1.2] - 2026-07-25 - a failed local write no longer kills your upload
+
+Bug-fix release. Found live: a user ran the README's own one-shot example,
+`./run.sh /run/readsb/aircraft.json --upload`, and it crashed after a clean
+decode with `PermissionError: [Errno 13] Permission denied:
+'/run/readsb/aircraft.wdgwars.json'`. `/run/readsb` is root-owned tmpfs the
+feeder account can read but not write — and `_guess_decoder_dirs()` /
+the `--schedule` prompt both actively suggest exactly that directory. Under
+a scheduled invocation this fails silently every cycle (no persistent
+journal on Raspberry Pi OS by default); the user only noticed by running
+the command by hand.
+
+### Fixed
+
+- **Output-path resolution now checks the configured output folder before
+  falling back to "beside the input."** Previously, passing an explicit
+  input path skipped the user's saved output-folder choice entirely and
+  always wrote next to the input file — the exact directory that, for a
+  decoder's runtime dir, the user can't write to. The order is now
+  `--out` > `--out-dir` > the folder saved by the first-run prompt (or
+  `--setup`) > beside the input, as a last resort. `--no-save` still wins
+  over all of it, unaffected by whether a folder is configured
+  (`_default_out_dir_from_prefs`, `_process_one_file`).
+- **A failed local write no longer aborts `--upload`.** The local
+  `.wdgwars.json` is a side artifact of the audit trail; the upload is the
+  actual point of running with `--upload`. `_write_local_output` now warns
+  loudly and returns to the caller with decoded records intact so the
+  upload still happens. A local-write failure is only a hard failure when
+  `--upload` was NOT requested — in that case the write was the entire
+  point of the run, so it fails cleanly with a message instead of quietly
+  reporting success.
+- **No more raw tracebacks for a permissions problem.** `PermissionError`
+  (and any other `OSError`) on the output path now prints a plain-language
+  line naming the exact path, saying it isn't writable, and suggesting
+  `--out-dir` — not a stack trace. The person hitting this is following
+  documented steps, not debugging Python.
+
+### Verified, not changed
+
+- The `--schedule` periodic-mode units (systemd `.service`/`.timer`, the
+  cron line, and the Windows `schtasks` action) already bake `--no-save`
+  into the generated command for exactly this reason — added before this
+  release and covered by `test_scheduler.py`'s
+  `test_periodic_service_uses_no_save` / `test_includes_no_save` /
+  `test_periodic_action_uses_no_save`. Periodic mode is the mode paired
+  with root-owned runtime dirs like `/run/readsb`, so **no existing
+  `--schedule` install needs to be re-run because of this release** — this
+  fix only changes the manual/direct-invocation path (`./run.sh <file>
+  --upload`, exactly what tonight's user ran) and the underlying
+  resolution logic it shares with every other code path. Watch mode
+  (`--watch`) is intentionally paired with user-writable directories and is
+  untouched here; a watch-mode-against-a-rolling-file issue found the same
+  night is tracked separately.
+
+### Added
+
+- `tests/test_output_resolution.py` — resolution-order tests (configured
+  folder wins over "beside the input" for an explicit path, `--out-dir`
+  and `--out` still win over the configured folder, `--no-save` still
+  wins over all of it) and failed-local-write tests (upload proceeds with
+  records intact on a mocked `PermissionError`, a clean non-zero exit
+  without `--upload`, no traceback, and a generic `OSError` handled the
+  same way). Filesystem permission failures are mocked on `Path.write_text`
+  rather than requiring a real unwritable directory.
+
 ## [2.1.1] - 2026-07-25 - `--schedule` now checks/enables systemd lingering
 
 Bug-fix release. Found live: a user set up `--schedule` on a headless Linux

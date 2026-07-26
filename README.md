@@ -91,6 +91,13 @@ Then point Muninn at the decoder's output:
 ./run.sh --watch /run/dump1090-fa --watch-glob 'aircraft.json'
 ```
 
+`/run/dump1090-fa` and `/run/readsb` are root-owned runtime directories —
+your account can usually read `aircraft.json` there but not write back
+into that folder. The one-shot command above still uploads fine either way
+(a local write failure warns but never blocks `--upload`), but to avoid the
+warning and keep a local copy, add `--out-dir` pointing at a folder you own,
+e.g. `--out-dir ~/muninn-output`.
+
 ### Antenna reality check
 
 The small whip that ships in most RTL-SDR kits is a general-purpose scanner antenna and will see almost nothing at 1090 MHz. A proper ADS-B antenna (quarter-wave around 6.8 cm, a FlightAware stub, or a Stratux / RadarBox dipole) will jump your aircraft count by 5 to 10 times. Indoor near a window works for testing; outdoor or rooftop is ideal.
@@ -164,7 +171,13 @@ If you prefer to skip the folder workflow:
 ./run.sh /path/to/your-capture.txt
 ```
 
-Output goes next to the input file (`your-capture.wdgwars.json`).
+Output resolves in this order: `--out` (exact path) > `--out-dir` (a
+folder) > the output folder you picked at first-run setup, if any > next
+to the input file (`your-capture.wdgwars.json`), as a last resort. That
+last-resort default matters if you point Muninn straight at a decoder's own
+runtime directory (e.g. `/run/readsb`) — those are usually root-owned and
+not writable by your account, so pick a folder you can write to with
+`--out-dir` (see the note under "One-shot" below).
 
 ---
 
