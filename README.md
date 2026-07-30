@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/signals_converter_ui.png" alt="Signals Converter UI" width="380"/>
+  <img src="assets/Signal Converter screenshot.jpg" alt="Signals Converter Screenshot" width="380"/>
 </p>
 
 Signals Converter was built to complement the Yggdrasil AI Labs converter and uploader developments while also using some raw formatting elements from cellular captures using Network Survey Analysis.
