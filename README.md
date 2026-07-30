@@ -1,14 +1,8 @@
 <p align="center">
-  <img src="assets/banner.png" alt="Muninn — Odin's memory-raven for the WDGWars sky" width="100%"/>
+  <img src="assets/signals_converter_mockup.svg" alt="Signals Converter UI" width="360"/>
 </p>
 
-<p align="center">
-  <a href="https://github.com/Yggdrasil-AI-labs/adsb-to-wdgwars/actions/workflows/ci-quality-gates.yml"><img alt="CI" src="https://github.com/Yggdrasil-AI-labs/adsb-to-wdgwars/actions/workflows/ci-quality-gates.yml/badge.svg"></a>
-  <a href="https://sonarcloud.io/dashboard?id=Yggdrasil-AI-labs_adsb-to-wdgwars"><img alt="Quality gate" src="https://sonarcloud.io/api/project_badges/measure?project=Yggdrasil-AI-labs_adsb-to-wdgwars&metric=alert_status"></a>
-  <a href="https://github.com/Yggdrasil-AI-labs/adsb-to-wdgwars/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/Yggdrasil-AI-labs/adsb-to-wdgwars?color=b08850&label=release"></a>
-  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-b08850.svg"></a>
-  <a href="https://github.com/Yggdrasil-AI-labs/adsb-to-wdgwars/blob/main/SECURITY.md"><img alt="Security" src="https://img.shields.io/badge/security-threat%20model-b08850.svg"></a>
-</p>
+Signals Converter was built to complement the Yggdrasil AI Labs converter and uploader developments while also using some raw formatting elements from cellular captures using Network Survey Analysis.
 
 # Muninn
 
