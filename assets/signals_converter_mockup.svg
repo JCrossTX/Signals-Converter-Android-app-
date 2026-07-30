@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 1015" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace">
+<rect x="0" y="0" width="600" height="1015" rx="18" fill="#000000" stroke="#123" stroke-width="1"/>
+<text x="26" y="60" fill="#00E5FF" font-size="26" font-weight="700" letter-spacing="3">SIGNALS CONVERTER</text>
+<text x="26" y="86.3" fill="#808080" font-size="12">/ adsb · meshcore · cellular → wdgwars + wigle /  on-device</text>
+<text x="26" y="114.8" fill="#00E5FF" font-size="12" font-weight="700" letter-spacing="2">// INPUT</text>
+<line x1="156" y1="110.8" x2="576" y2="110.8" stroke="#00E5FF" stroke-opacity="0.25"/>
+<text x="26" y="133.8" fill="#00E5FF" font-size="13">[ + ADD FILES ]        [ INPUT FOLDER ]</text>
+<text x="26" y="152.8" fill="#00E5FF" font-size="13">reusable path : Network_Survey</text>
+<text x="26" y="171.8" fill="#808080" font-size="13">pick several at once — tap/long-press each file (any type)</text>
+<text x="26" y="190.8" fill="#00E5FF" font-size="13">.csv .json .ndjson .txt .log .sqb .sbs .beast</text>
+<text x="26" y="209.8" fill="#00E5FF" font-size="13">.zip .gz .tar .xz .7z .zst  //  Traffic.csv · lte_records</text>
+<text x="26" y="238.3" fill="#00E5FF" font-size="12" font-weight="700" letter-spacing="2">// OUTPUT DESTINATION</text>
+<line x1="156" y1="234.3" x2="576" y2="234.3" stroke="#00E5FF" stroke-opacity="0.25"/>
+<text x="26" y="257.3" fill="#00E5FF" font-size="13">[ CHANGE OUTPUT FOLDER ]</text>
+<text x="26" y="276.3" fill="#00E5FF" font-size="13">writing to : WDGWars_out</text>
+<text x="26" y="304.8" fill="#00E5FF" font-size="12" font-weight="700" letter-spacing="2">// CONVERT</text>
+<line x1="156" y1="300.8" x2="576" y2="300.8" stroke="#00E5FF" stroke-opacity="0.25"/>
+<rect x="26" y="310.8" width="550" height="20" rx="3" fill="#00E5FF"/>
+<text x="300.0" y="325.8" fill="#000" font-size="12" font-weight="700" letter-spacing="2" text-anchor="middle">C O N V E R T</text>
+<text x="26" y="350.40000000000003" fill="#00E436" font-size="13">[OK] Traffic.csv → Traffic.aircraft.wdgwars.json (312 aircraft)</text>
+<text x="26" y="369.40000000000003" fill="#00E436" font-size="13">[OK] lte_records_20260729.csv → ....wigle.csv (9734 cell)</text>
+<text x="26" y="388.40000000000003" fill="#FBBF24" font-size="13">   ! 35722 neighbour measurements not uploadable</text>
+<text x="26" y="407.40000000000003" fill="#FBBF24" font-size="13">     (PCI only, no global cell ID — expected)</text>
+<text x="26" y="426.40000000000003" fill="#00E436" font-size="13">[OK] nr_records_20260729.csv → ....wigle.csv (413 cell)</text>
+<text x="26" y="445.40000000000003" fill="#00E436" font-size="13">[OK] 3 output file(s) ready in the output folder</text>
+<text x="26" y="473.90000000000003" fill="#00E5FF" font-size="12" font-weight="700" letter-spacing="2">// OUTPUT // FILES</text>
+<line x1="156" y1="469.90000000000003" x2="576" y2="469.90000000000003" stroke="#00E5FF" stroke-opacity="0.25"/>
+<text x="26" y="492.90000000000003" fill="#E0E0E0" font-size="13">[AIRCRAFT]  Traffic.aircraft.wdgwars.json          312</text>
+<text x="26" y="511.90000000000003" fill="#FBBF24" font-size="13">[CELL]      lte_records_20260729.wigle.csv        9734</text>
+<text x="26" y="530.9000000000001" fill="#FBBF24" font-size="13">[CELL]      nr_records_20260729.wigle.csv          413</text>
+<text x="26" y="559.4000000000001" fill="#00E5FF" font-size="12" font-weight="700" letter-spacing="2">// WIGLE.NET</text>
+<line x1="156" y1="555.4000000000001" x2="576" y2="555.4000000000001" stroke="#00E5FF" stroke-opacity="0.25"/>
+<text x="26" y="578.4000000000001" fill="#00E436" font-size="13">✓ credentials saved (locked)</text>
+<text x="26" y="597.4000000000001" fill="#808080" font-size="13">WIGLE API NAME   : ••••••••</text>
+<text x="26" y="616.4000000000001" fill="#808080" font-size="13">WIGLE API TOKEN  : ••••••••</text>
+<text x="26" y="635.4000000000001" fill="#00E5FF" font-size="13">[ CLEAR CREDENTIALS ]</text>
+<text x="26" y="663.9000000000001" fill="#00E5FF" font-size="12" font-weight="700" letter-spacing="2">// WDGWARS.PL</text>
+<line x1="156" y1="659.9000000000001" x2="576" y2="659.9000000000001" stroke="#00E5FF" stroke-opacity="0.25"/>
+<text x="26" y="682.9000000000001" fill="#00E436" font-size="13">✓ key saved (locked)</text>
+<text x="26" y="701.9000000000001" fill="#808080" font-size="13">WDGWARS API KEY  : ••••••••</text>
+<text x="26" y="720.9000000000001" fill="#00E5FF" font-size="13">[ CLEAR KEY ]    [ TEST KEY ]</text>
+<text x="26" y="749.4000000000001" fill="#00E5FF" font-size="12" font-weight="700" letter-spacing="2">// UPLOAD // DISPATCH</text>
+<line x1="156" y1="745.4000000000001" x2="576" y2="745.4000000000001" stroke="#00E5FF" stroke-opacity="0.25"/>
+<text x="26" y="768.4000000000001" fill="#00E5FF" font-size="13">[ UPLOAD → WIGLE ]   [ UPLOAD → WDGWARS ]</text>
+<rect x="26" y="774.4000000000001" width="550" height="20" rx="3" fill="#00E5FF"/>
+<text x="300.0" y="789.4000000000001" fill="#000" font-size="12" font-weight="700" letter-spacing="2" text-anchor="middle">U P L O A D   →   B O T H</text>
+<text x="26" y="814.0000000000001" fill="#00E436" font-size="13">Traffic.aircraft.wdgwars.json → WDGWars: ✓ 312 new, 0 seen</text>
+<text x="26" y="833.0000000000001" fill="#00E436" font-size="13">lte_records_20260729.wigle.csv → WiGLE:  ✓ accepted</text>
+<text x="26" y="852.0000000000001" fill="#00E436" font-size="13">lte_records_20260729.wigle.csv → WDGWars: ✓ 9734 new, 0 dup</text>
+<text x="26" y="871.0000000000001" fill="#00E436" font-size="13">nr_records_20260729.wigle.csv  → WiGLE:  ✓ accepted</text>
+<text x="26" y="890.0000000000001" fill="#00E436" font-size="13">nr_records_20260729.wigle.csv  → WDGWars: ✓ 413 new, 0 dup</text>
+<text x="26" y="918.5000000000001" fill="#808080" font-size="11" letter-spacing="1">signals converter // 0.1.1</text>
+</svg>
